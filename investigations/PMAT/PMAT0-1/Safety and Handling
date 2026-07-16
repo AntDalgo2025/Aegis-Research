@@ -1,0 +1,115 @@
+# PMAT 0-1: Handling and Safety
+
+## Objective
+
+The objective of this investigation was to establish a repeatable process for handling malware samples without relying on undocumented assumptions or common sense. The investigation focused on identifying risks that exist before detonation, defining controls to reduce those risks, and determining what evidence should be collected to confirm that the controls are working as intended.
+
+## Lab Environment
+
+The investigation was conducted using a FlareVM virtual machine connected to a host-only lab network configured for isolation. REMnux was available for controlled communication when needed. Malware samples were stored locally inside FlareVM, with no cloud synchronization or VirtualBox shared-folder access enabled.
+
+At this stage, the environment was configured for isolation but was not described as fully validated until network routes and multiple forms of external connectivity were tested and documented.
+
+## Risks Identified
+
+Malware handling creates risk before a sample is intentionally executed. The primary handling stages evaluated were sample transfer, archive extraction, and preparation for detonation.
+
+During sample transfer, an enabled NAT or bridged network adapter could expose the virtual machine to the internet or normal local network. Shared folders, clipboard sharing, and drag-and-drop could also create unintended communication paths between FlareVM and the host.
+
+During extraction, the sample could be placed in a shared, synchronized, or unintended directory. Once removed from its password-protected archive, the sample would no longer benefit from the archive’s access controls and could be accidentally executed.
+
+During preparation for detonation, restoring the sample’s executable extension before the lab was ready could result in premature execution. Additional risks included beginning without a known pre-execution snapshot or operating outside the intended host-only network boundary.
+
+## Safety Controls
+
+Several controls were established to reduce the risk of accidental execution, unintended network communication, and sample exposure outside the malware-analysis environment.
+
+Malware samples were kept inside password-protected archives during storage and transfer. After extraction, samples were placed in a known local directory inside FlareVM that was not synchronized with cloud storage or exposed through a VirtualBox shared folder.
+
+Executable samples were defanged by changing the file extension to a non-executable extension such as `.malz`. This control reduced the likelihood of accidental execution through normal Windows file association behavior. Defanging did not remove the executable content or make the sample harmless.
+
+VirtualBox shared folders, shared clipboard, and drag-and-drop were disabled to reduce communication paths between FlareVM and the host. NAT and bridged networking were disabled during malware handling. FlareVM was configured to use only the designated host-only network adapter.
+
+A known pre-execution snapshot was maintained before detonation. The snapshot represented the intended baseline state: no sample had been executed, the lab controls were in place, and the virtual machine remained in its expected pre-analysis condition.
+
+## Validation and Evidence
+
+Controls were evaluated through configuration review and observable system state.
+
+The sample directory was confirmed to exist locally on FlareVM’s virtual disk. OneDrive and other synchronization services were not active, and the directory was not exposed to the host through a VirtualBox shared folder.
+
+The VirtualBox network configuration showed the designated host-only adapter enabled while NAT and bridged adapters were disabled. A successful ping from FlareVM to REMnux demonstrated ICMP communication within the host-only network.
+
+A failed ping to an external address, such as `8.8.8.8`, provided initial evidence that external ICMP communication was unavailable. This result alone was not considered sufficient to validate complete internet isolation because other protocols could remain functional even when ICMP failed.
+
+Stronger validation would include reviewing the routing table for the absence of an external default gateway and testing additional outbound communication methods, including external TCP and DNS connectivity. Until those tests are performed and recorded, the environment should be described as configured for isolation rather than fully validated as isolated.
+
+The pre-execution snapshot was confirmed through the virtual machine snapshot manager and by comparing the virtual machine against its expected baseline state. Snapshot names and descriptions supported documentation but were not treated as proof that the captured state was clean.
+
+## Lab Boundaries
+
+The lab boundaries define the communication and storage behavior permitted during malware handling and analysis.
+
+FlareVM may communicate with REMnux over the designated host-only network when controlled services such as INetSim are intentionally used. FlareVM may not communicate with the public internet, the normal local network, or unintended systems outside the malware-analysis environment.
+
+The malware sample must remain inside its designated local directory within FlareVM. It must not be stored in host-shared directories, cloud-synchronized folders, host-mounted drives, or other locations that could move the sample outside the lab.
+
+Communication paths between FlareVM and the host must remain disabled unless a specific investigation requires one and the risk has been evaluated beforehand. Shared folders, shared clipboard, and drag-and-drop are therefore outside the permitted lab boundary during malware handling.
+
+Any observed communication or file access outside these defined boundaries requires the investigation to stop until the cause is identified and the environment is returned to its intended state.
+
+## Pre-Detonation Checklist
+
+Before restoring the sample’s executable extension or intentionally beginning detonation, the following conditions must be confirmed:
+
+* A known pre-execution snapshot exists.
+* The sample is stored in the intended local directory inside FlareVM.
+* The sample remains defanged until execution is intentional.
+* VirtualBox shared folders are disabled.
+* Shared clipboard and drag-and-drop are disabled.
+* NAT and bridged network adapters are disabled.
+* Only the designated host-only network adapter is active.
+* FlareVM can communicate only with intended lab systems, such as REMnux when required.
+* Monitoring and analysis tools are prepared before execution begins.
+* The analyst is intentionally transitioning from handling to detonation.
+
+Restoring the executable extension should be treated as the final deliberate action after the environment has been reviewed.
+
+## Stop Conditions
+
+The investigation must stop if the environment no longer matches the defined lab boundaries.
+
+Stop conditions include:
+
+* FlareVM unexpectedly reaches the public internet.
+* FlareVM communicates with the normal local network.
+* The sample accesses a host-shared or synchronized directory.
+* An unintended communication path to the host is discovered.
+* NAT, bridged networking, shared folders, shared clipboard, or drag-and-drop are found enabled unexpectedly.
+* The sample executes before the lab is ready.
+* The current VM state cannot be confidently traced back to a known pre-execution baseline.
+* Unexpected traffic leaves the designated malware-analysis subnet.
+
+If a stop condition occurs, sample execution should end when safely possible, the affected VM state should be preserved if evidence collection is necessary, and the cause should be investigated before analysis resumes.
+
+## Limitations and Remaining Unknowns
+
+The host-only network was configured for isolation, but complete isolation was not fully validated during this stage. A failed ping to an external IP address provides evidence only for failed ICMP communication and does not prove that all TCP, UDP, or DNS traffic is blocked.
+
+Additional validation should include reviewing the routing table for unintended default routes and testing multiple forms of outbound communication. The investigation also did not evaluate protection against hypervisor vulnerabilities, VM escape techniques, or unknown flaws in the virtualization platform.
+
+Defanging a sample by changing its extension reduces accidental execution but does not modify the underlying executable content. Password-protected archives reduce accidental access during storage and transfer, but those protections no longer apply after extraction.
+
+A clean snapshot provides a recovery point but does not guarantee that every form of contamination would be detected. Its reliability depends on the snapshot being created before sample execution and after confirming the intended baseline state.
+
+## Lessons Learned
+
+Malware handling begins before execution. Transfer, extraction, storage, and preparation for detonation all introduce risks that require defined controls.
+
+A configured control should not automatically be treated as a validated control. Isolation must be supported by observable evidence, and one failed connectivity test is not sufficient to prove that all outbound communication is blocked.
+
+Defanging, password-protected archives, dedicated storage locations, disabled host-integration features, and clean snapshots reduce risk, but none of these controls make a malware sample harmless.
+
+Lab boundaries and stop conditions should be documented rather than left to common sense. Explicit boundaries make the process repeatable, allow another analyst to review the environment, and provide clear criteria for deciding whether an investigation can safely continue.
+
+The primary outcome of this investigation was a repeatable malware-handling process that distinguishes intended configuration from tested evidence and defines when analysis must stop.
